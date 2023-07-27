@@ -59,14 +59,12 @@ func main() {
 	}
 	// don't show a notification for commands that run faster than the threshold
 	if cmdDuration < threshold {
-		//return
+		return
 	}
 	// don't show a notification if the foreground app didn't change
 	if currFgAppAsn == prevFgAppAsn {
 		return
 	}
-
-	//set -l bundleid (lsappinfo info -only bundleid $fg_app_asn | awk -F'"' '{ print $4 }')
 
 	bundleInfo, err := execCmd("lsappinfo", "info", "-only", "bundleid", prevFgAppAsn)
 	if err != nil {
