@@ -11,12 +11,13 @@ import (
 
 func main() {
 	var (
-		cmd          string
-		cmdDuration  int
-		cmdStatus    int
-		threshold    int
-		currFgAppAsn string
-		prevFgAppAsn string
+		cmd               string
+		cmdDuration       int
+		cmdStatus         int
+		threshold         int
+		currFgAppAsn      string
+		prevFgAppAsn      string
+		prevFgAppBundleID string
 	)
 
 	flag.StringVar(&cmd, "cmd", "", "Command to run")
@@ -24,6 +25,7 @@ func main() {
 	flag.IntVar(&cmdStatus, "status", -1, "Status of command")
 	flag.IntVar(&threshold, "threshold", 5000, "Threshold for command duration in ms")
 	flag.StringVar(&prevFgAppAsn, "prev_fg_app_asn", "", "Foreground App ASN before command")
+	flag.StringVar(&prevFgAppBundleID, "prev_fg_app_bundleid", "", "Foreground App bundleID before command (optional)")
 	flag.StringVar(&currFgAppAsn, "curr_fg_app_asn", "", "Foreground App ASN after command")
 	flag.Parse()
 
@@ -66,19 +68,21 @@ func main() {
 		return
 	}
 
-	bundleInfo, err := execCmd("lsappinfo", "info", "-only", "bundleid", prevFgAppAsn)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-		return
+	if prevFgAppBundleID == "" {
+		bundleInfo, err := execCmd("lsappinfo", "info", "-only", "bundleid", prevFgAppAsn)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+			return
+		}
+		bundleInfoParts := strings.Split(strings.TrimSpace(bundleInfo), "\"")
+		if len(bundleInfoParts) == 5 {
+			prevFgAppBundleID = bundleInfoParts[3]
+		} else {
+			fmt.Printf("warning: invalid bundle info: '%s'\n", bundleInfo)
+		}
+
 	}
-	bundleInfoParts := strings.Split(strings.TrimSpace(bundleInfo), "\"")
-	if len(bundleInfoParts) != 5 {
-		fmt.Println("unexpected bundle info:", bundleInfo)
-		os.Exit(1)
-		return
-	}
-	bundleId := bundleInfoParts[3]
 
 	durationSeconds := float64(cmdDuration) / 1000.0
 	var msg string
@@ -91,14 +95,18 @@ func main() {
 		sound = "Hero.aiff"
 	}
 
-	_, err = execCmd(
-		"terminal-notifier",
+	args := []string{
 		"-group", "fish-slow-commands",
 		"-title", cmd,
 		"-message", msg,
 		"-sound", sound,
-		"-sender", bundleId,
-		"-ignoreDnD")
+		"-ignoreDnD",
+	}
+	if prevFgAppBundleID != "" {
+		args = append(args, "-sender", prevFgAppBundleID)
+	}
+
+	_, err := execCmd("terminal-notifier", args...)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
